@@ -24,6 +24,16 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+/*
+ * libevent的使用流程:
+ * ===================
+ * 1) 调用event_init()接口初始化libevent
+ * 2) 调用event_set()接口设计事件
+ * 3) 调用event_add()接口把事件添加到libevent中进行监听
+ * 4) 调用event_dispatch()开始等待事件的触发, 并调用事件关联的回调函数
+ */
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -166,6 +176,9 @@ RB_PROTOTYPE(event_tree, event, ev_timeout_node, compare);
 RB_GENERATE(event_tree, event, ev_timeout_node, compare);
 
 
+/*
+ * 初始化libevent环境
+ */
 void *
 event_init(void)
 {
@@ -176,20 +189,21 @@ event_init(void)
 
 	event_sigcb = NULL;
 	event_gotsig = 0;
-	gettime(&current_base->event_tv);
+	gettime(&current_base->event_tv); // 获取当前时间
 
 	// 初始化一些队列
 	RB_INIT(&current_base->timetree);
 	TAILQ_INIT(&current_base->eventqueue);
 	TAILQ_INIT(&signalqueue);
-	
+
+	// 选择合适的多路复用IO接口
 	current_base->evbase = NULL;
 	for (i = 0; eventops[i] && !current_base->evbase; i++) {
 		current_base->evsel = eventops[i];
-
 		current_base->evbase = current_base->evsel->init();
 	}
 
+	// 如果初始化多路复用IO接口失败
 	if (current_base->evbase == NULL)
 		event_errx(1, "%s: no event mechanism available", __func__);
 
@@ -198,6 +212,7 @@ event_init(void)
 			   current_base->evsel->name);
 
 	/* allocate a single active event queue */
+	// 初始化活跃优先队列
 	event_base_priority_init(current_base, 1);
 
 	return (current_base);
@@ -253,11 +268,13 @@ event_base_priority_init(struct event_base *base, int npriorities)
 
 	/* Allocate our priority queues */
 	base->nactivequeues = npriorities;
+	/* bug here? */
 	base->activequeues = (struct event_list **)calloc(base->nactivequeues,
 	    npriorities * sizeof(struct event_list *));
 	if (base->activequeues == NULL)
 		event_err(1, "%s: calloc", __func__);
 
+	// 创建event_list对象
 	for (i = 0; i < base->nactivequeues; ++i) {
 		base->activequeues[i] = malloc(sizeof(struct event_list));
 		if (base->activequeues[i] == NULL)
@@ -374,13 +391,13 @@ event_base_loop(struct event_base *base, int flags)
 			return (-1);
 
 		/* Terminate the loop if we have been asked to */
-		if (base->event_gotterm) {
+		if (base->event_gotterm) { // 结束loop
 			base->event_gotterm = 0;
 			break;
 		}
 
 		/* You cannot use this interface for multi-threaded apps */
-		while (event_gotsig) {
+		while (event_gotsig) { // 如果收到信号
 			event_gotsig = 0;
 			if (event_sigcb) {
 				res = (*event_sigcb)();
@@ -393,35 +410,37 @@ event_base_loop(struct event_base *base, int flags)
 
 		/* Check if time is running backwards */
 		gettime(&tv);
-		if (timercmp(&tv, &base->event_tv, <)) {
+		if (timercmp(&tv, &base->event_tv, <)) { // 如果当前时候比最后一次更新的时间小, 说明服务器时间出错了
 			struct timeval off;
 			event_debug(("%s: time is running backwards, corrected",
 				    __func__));
+			// 调整时间
 			timersub(&base->event_tv, &tv, &off);
 			timeout_correct(base, &off);
 		}
 		base->event_tv = tv;
 
+		// epoll需要等待的最大时间
 		if (!base->event_count_active && !(flags & EVLOOP_NONBLOCK))
 			timeout_next(base, &tv);
 		else
 			timerclear(&tv);
-		
+
 		/* If we have no events, we just exit */
 		if (!event_haveevents(base)) {
 			event_debug(("%s: no events registered.", __func__));
 			return (1);
 		}
 
-		res = evsel->dispatch(base, evbase, &tv);
+		res = evsel->dispatch(base, evbase, &tv); // 开始等待事件的发生
 
 		if (res == -1)
 			return (-1);
 
-		timeout_process(base);
+		timeout_process(base); // 把超时事件放进活动队列中
 
 		if (base->event_count_active) {
-			event_process_active(base);
+			event_process_active(base); // 处理活动队列的事件
 			if (!base->event_count_active && (flags & EVLOOP_ONCE))
 				done = 1;
 		} else if (flags & EVLOOP_NONBLOCK)
@@ -493,6 +512,9 @@ event_once(int fd, short events,
 	return (0);
 }
 
+/*
+ * 设置事件相关的数据(如: 关注的文件句柄和事件, 回调函数等等)
+ */
 void
 event_set(struct event *ev, int fd, short events,
 	  void (*callback)(int, short, void *), void *arg)
@@ -576,6 +598,9 @@ event_pending(struct event *ev, short event, struct timeval *tv)
 	return (flags & event);
 }
 
+/*
+ * 把事件对象添加到libevent中进行监听
+ */
 int
 event_add(struct event *ev, struct timeval *tv)
 {
@@ -593,16 +618,17 @@ event_add(struct event *ev, struct timeval *tv)
 
 	assert(!(ev->ev_flags & ~EVLIST_ALL));
 
+	// 如果需要设置超时的
 	if (tv != NULL) {
 		struct timeval now;
 
-		if (ev->ev_flags & EVLIST_TIMEOUT)
+		if (ev->ev_flags & EVLIST_TIMEOUT) // 当前事件已经在timeout队列中, 那么把他从timeout队列中删除
 			event_queue_remove(base, ev, EVLIST_TIMEOUT);
 
 		/* Check if it is active due to a timeout.  Rescheduling
 		 * this timeout before the callback can be executed
 		 * removes it from the active list. */
-		if ((ev->ev_flags & EVLIST_ACTIVE) &&
+		if ((ev->ev_flags & EVLIST_ACTIVE) && // 如果当前事件已经超时, 那么把此事件从活动队列中删除
 		    (ev->ev_res & EV_TIMEOUT)) {
 			/* See if we are just active executing this
 			 * event in a loop
@@ -615,6 +641,7 @@ event_add(struct event *ev, struct timeval *tv)
 			event_queue_remove(base, ev, EVLIST_ACTIVE);
 		}
 
+		// 计算超时时间
 		gettime(&now);
 		timeradd(&now, tv, &ev->ev_timeout);
 
@@ -622,18 +649,21 @@ event_add(struct event *ev, struct timeval *tv)
 			 "event_add: timeout in %d seconds, call %p",
 			 tv->tv_sec, ev->ev_callback));
 
+		// 把事件添加到超时队列中
 		event_queue_insert(base, ev, EVLIST_TIMEOUT);
 	}
 
+	// IO事件
 	if ((ev->ev_events & (EV_READ|EV_WRITE)) &&
 	    !(ev->ev_flags & (EVLIST_INSERTED|EVLIST_ACTIVE))) {
-		event_queue_insert(base, ev, EVLIST_INSERTED);
 
+		event_queue_insert(base, ev, EVLIST_INSERTED); // 添加到IO队列中
 		return (evsel->add(evbase, ev));
-	} else if ((ev->ev_events & EV_SIGNAL) &&
-	    !(ev->ev_flags & EVLIST_SIGNAL)) {
-		event_queue_insert(base, ev, EVLIST_SIGNAL);
 
+	} else if ((ev->ev_events & EV_SIGNAL) &&
+	    !(ev->ev_flags & EVLIST_SIGNAL)) { // 信号事件
+
+		event_queue_insert(base, ev, EVLIST_SIGNAL); // 添加到信号队列中
 		return (evsel->add(evbase, ev));
 	}
 
@@ -666,16 +696,17 @@ event_del(struct event *ev)
 		*ev->ev_pncalls = 0;
 	}
 
-	if (ev->ev_flags & EVLIST_TIMEOUT)
+	if (ev->ev_flags & EVLIST_TIMEOUT) // 如果在timeout队列, 那么删除之
 		event_queue_remove(base, ev, EVLIST_TIMEOUT);
 
-	if (ev->ev_flags & EVLIST_ACTIVE)
+	if (ev->ev_flags & EVLIST_ACTIVE) // 如果在active队列, 那么删除之
 		event_queue_remove(base, ev, EVLIST_ACTIVE);
 
-	if (ev->ev_flags & EVLIST_INSERTED) {
+	if (ev->ev_flags & EVLIST_INSERTED) { // 如果在IO队列, 那么删除之
 		event_queue_remove(base, ev, EVLIST_INSERTED);
 		return (evsel->del(evbase, ev));
-	} else if (ev->ev_flags & EVLIST_SIGNAL) {
+
+	} else if (ev->ev_flags & EVLIST_SIGNAL) { // 如果在信号队列, 删除之
 		event_queue_remove(base, ev, EVLIST_SIGNAL);
 		return (evsel->del(evbase, ev));
 	}
@@ -741,6 +772,9 @@ timeout_correct(struct event_base *base, struct timeval *off)
 		timersub(&ev->ev_timeout, off, &ev->ev_timeout);
 }
 
+/*
+ * 处理超时事件
+ */
 void
 timeout_process(struct event_base *base)
 {
@@ -749,6 +783,7 @@ timeout_process(struct event_base *base)
 
 	gettime(&now);
 
+	// 从红黑树中取得最快超时的事件
 	for (ev = RB_MIN(event_tree, &base->timetree); ev; ev = next) {
 		if (timercmp(&ev->ev_timeout, &now, >))
 			break;
@@ -759,9 +794,9 @@ timeout_process(struct event_base *base)
 		/* delete this event from the I/O queues */
 		event_del(ev);
 
-		event_debug(("timeout_process: call %p",
-			 ev->ev_callback));
-		event_active(ev, EV_TIMEOUT, 1);
+		event_debug(("timeout_process: call %p", ev->ev_callback));
+
+		event_active(ev, EV_TIMEOUT, 1); // 把事件添加到活动队列中
 	}
 }
 
@@ -781,6 +816,7 @@ event_queue_remove(struct event_base *base, struct event *ev, int queue)
 		base->event_count--;
 
 	ev->ev_flags &= ~queue;
+
 	switch (queue) {
 	case EVLIST_ACTIVE:
 		if (docount)
@@ -788,20 +824,27 @@ event_queue_remove(struct event_base *base, struct event *ev, int queue)
 		TAILQ_REMOVE(base->activequeues[ev->ev_pri],
 		    ev, ev_active_next);
 		break;
+
 	case EVLIST_SIGNAL:
 		TAILQ_REMOVE(&signalqueue, ev, ev_signal_next);
 		break;
+
 	case EVLIST_TIMEOUT:
 		RB_REMOVE(event_tree, &base->timetree, ev);
 		break;
+
 	case EVLIST_INSERTED:
 		TAILQ_REMOVE(&base->eventqueue, ev, ev_next);
 		break;
+
 	default:
 		event_errx(1, "%s: unknown queue %x", __func__, queue);
 	}
 }
 
+/*
+ * 把事件对象添加到相应的队列中
+ */
 void
 event_queue_insert(struct event_base *base, struct event *ev, int queue)
 {
@@ -822,25 +865,30 @@ event_queue_insert(struct event_base *base, struct event *ev, int queue)
 	if (docount)
 		base->event_count++;
 
-	ev->ev_flags |= queue;
+	ev->ev_flags |= queue; // 添加旗标位
+
 	switch (queue) {
-	case EVLIST_ACTIVE:
+	case EVLIST_ACTIVE: // 添加到活动列表
 		if (docount)
 			base->event_count_active++;
 		TAILQ_INSERT_TAIL(base->activequeues[ev->ev_pri],
 		    ev,ev_active_next);
 		break;
-	case EVLIST_SIGNAL:
+
+	case EVLIST_SIGNAL: // 添加信号列表
 		TAILQ_INSERT_TAIL(&signalqueue, ev, ev_signal_next);
 		break;
-	case EVLIST_TIMEOUT: {
+
+	case EVLIST_TIMEOUT: { // 添加到timeout列表
 		struct event *tmp = RB_INSERT(event_tree, &base->timetree, ev);
 		assert(tmp == NULL);
 		break;
 	}
-	case EVLIST_INSERTED:
+
+	case EVLIST_INSERTED: // 添加到IO列表
 		TAILQ_INSERT_TAIL(&base->eventqueue, ev, ev_next);
 		break;
+
 	default:
 		event_errx(1, "%s: unknown queue %x", __func__, queue);
 	}
