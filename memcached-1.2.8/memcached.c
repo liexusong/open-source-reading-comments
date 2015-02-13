@@ -2421,8 +2421,7 @@ static int server_socket(const int port, const bool is_udp) {
             }
         }
 
-        if (is_udp)
-        {
+        if (is_udp) {
           int c;
 
           for (c = 1; c < settings.num_threads; c++) {
@@ -2430,7 +2429,9 @@ static int server_socket(const int port, const bool is_udp) {
               dispatch_conn_new(sfd, conn_read, EV_READ | EV_PERSIST,
                                 UDP_READ_BUFFER_SIZE, is_udp);
           }
+
         } else {
+          // 把监听的socket添加到libevent中进行监听, 所有socket的回调函数都是drive_machine()
           if (!(listen_conn_add = conn_new(sfd, conn_listening,
                                            EV_READ | EV_PERSIST, 1, false, main_base))) {
               fprintf(stderr, "failed to create listening connection\n");
@@ -2820,6 +2821,7 @@ int main (int argc, char **argv) {
     setbuf(stderr, NULL);
 
     /* process arguments */
+    // 处理命令行参数
     while ((c = getopt(argc, argv, "a:p:s:U:m:Mc:khirvdl:u:P:f:s:n:t:D:LR:b:")) != -1) {
         switch (c) {
         case 'a':
@@ -3011,13 +3013,13 @@ int main (int argc, char **argv) {
     }
 
     /* initialize main thread libevent instance */
-    main_base = event_init();
+    main_base = event_init(); // 主libevent对象
 
     /* initialize other stuff */
-    item_init();
-    stats_init();
-    assoc_init();
-    conn_init();
+    item_init();  // 初始化item环境
+    stats_init(); // 初始化stats环境
+    assoc_init(); // 初始化HashTable
+    conn_init();  // 初始化连接环境
     /* Hacky suffix buffers. */
     suffix_init();
     slabs_init(settings.maxbytes, settings.factor, preallocate);
@@ -3034,13 +3036,13 @@ int main (int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
     /* start up worker threads if MT mode */
-    thread_init(settings.num_threads, main_base);
+    thread_init(settings.num_threads, main_base); // 初始化worker线程
     /* save the PID in if we're a daemon, do this after thread_init due to
        a file descriptor handling bug somewhere in libevent */
     if (daemonize)
         save_pid(getpid(), pid_file);
     /* initialise clock event */
-    clock_handler(0, 0, 0);
+    clock_handler(0, 0, 0); // 更新当前时间定时器
     /* initialise deletion array and timer event */
     deltotal = 200;
     delcurr = 0;
@@ -3048,10 +3050,14 @@ int main (int argc, char **argv) {
         perror("failed to allocate memory for deletion array");
         exit(EXIT_FAILURE);
     }
+
+    // 创建删除延时删除item的定时器
     delete_handler(0, 0, 0); /* sets up the event */
 
     /* create unix mode sockets after dropping privileges */
-    if (settings.socketpath != NULL) {
+    // 创建监听的socket
+
+    if (settings.socketpath != NULL) { // 如果使用unix socket的话
         errno = 0;
         if (server_socket_unix(settings.socketpath,settings.access)) {
           fprintf(stderr, "failed to listen on UNIX socket: %s\n", settings.socketpath);
@@ -3062,7 +3068,7 @@ int main (int argc, char **argv) {
     }
 
     /* create the listening socket, bind it, and init */
-    if (settings.socketpath == NULL) {
+    if (settings.socketpath == NULL) { // 如果使用TCP socket
         errno = 0;
         if (settings.port && server_socket(settings.port, 0)) {
             fprintf(stderr, "failed to listen on TCP port %d\n", settings.port);

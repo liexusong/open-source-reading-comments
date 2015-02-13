@@ -476,7 +476,7 @@ static bool expanding = false;
 static unsigned int expand_bucket = 0;
 
 void assoc_init(void) {
-    primary_hashtable = calloc(hashsize(hashpower), sizeof(void *));
+    primary_hashtable = calloc(hashsize(hashpower), sizeof(void *)); // 创建HashTable
     if (! primary_hashtable) {
         fprintf(stderr, "Failed to init hashtable.\n");
         exit(EXIT_FAILURE);

@@ -38,6 +38,9 @@ static item *tails[LARGEST_ID];
 static itemstats_t itemstats[LARGEST_ID];
 static unsigned int sizes[LARGEST_ID];
 
+/*
+ * 初始化item环境
+ */
 void item_init(void) {
     int i;
     memset(itemstats, 0, sizeof(itemstats_t) * LARGEST_ID);
