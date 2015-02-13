@@ -101,10 +101,13 @@ evsignal_init(sigset_t *evsigmask)
 	FD_CLOSEONEXEC(ev_signal_pair[0]);
 	FD_CLOSEONEXEC(ev_signal_pair[1]);
 
+	// 读端需要设置为非阻塞
 	fcntl(ev_signal_pair[0], F_SETFL, O_NONBLOCK);
 
+	// 设置信号事件
 	event_set(&ev_signal, ev_signal_pair[1], EV_READ,
 	    evsignal_cb, &ev_signal);
+
 	ev_signal.ev_flags |= EVLIST_INTERNAL;
 }
 

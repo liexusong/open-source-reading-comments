@@ -122,6 +122,7 @@ epoll_init(void)
 
 	/* Initalize the kernel queue */
 
+	// 创建epoll句柄
 	if ((epfd = epoll_create(nfiles)) == -1) {
                 event_warn("epoll_create");
 		return (NULL);
@@ -194,11 +195,14 @@ epoll_dispatch(struct event_base *base, void *arg, struct timeval *tv)
 		return (-1);
 
 	timeout = tv->tv_sec * 1000 + (tv->tv_usec + 999) / 1000;
+
+	// 开始监听事件
 	res = epoll_wait(epollop->epfd, events, epollop->nevents, timeout);
 
 	if (evsignal_recalc(&epollop->evsigmask) == -1)
 		return (-1);
 
+	// 处理信号事件
 	if (res == -1) {
 		if (errno != EINTR) {
 			event_warn("epoll_wait");
@@ -218,11 +222,11 @@ epoll_dispatch(struct event_base *base, void *arg, struct timeval *tv)
 		struct event *evread = NULL, *evwrite = NULL;
 
 		evep = (struct evepoll *)events[i].data.ptr;
-   
-                if (what & EPOLLHUP)
-                        what |= EPOLLIN | EPOLLOUT;
-                else if (what & EPOLLERR)
-                        what |= EPOLLIN | EPOLLOUT;
+
+        if (what & EPOLLHUP)
+            what |= EPOLLIN | EPOLLOUT;
+        else if (what & EPOLLERR)
+            what |= EPOLLIN | EPOLLOUT;
 
 		if (what & EPOLLIN) {
 			evread = evep->evread;
@@ -290,7 +294,7 @@ epoll_add(void *arg, struct event *ev)
 	epev.data.ptr = evep;
 	epev.events = events;
 	if (epoll_ctl(epollop->epfd, op, ev->ev_fd, &epev) == -1)
-			return (-1);
+		return (-1);
 
 	/* Update events responsible */
 	if (ev->ev_events & EV_READ)
