@@ -22,3 +22,7 @@ void zend_activate(TSRMLS_D)
     startup_scanner(TSRMLS_C);
 }
 ```
+init_compiler()主要是初始化编译器用到的一些数据结构，而init_executor()主要是初始化解析器用到的一些数据结构。<br/><br/>
+
+zend_set_timeout()设置PHP的超时时间，Linux系统主要使用setitimer()接口设置。<br />
+zend_activate_modules()用于初始化所有Zend模块，主要是调用每个Zend模块的request_startup_func()接口。
