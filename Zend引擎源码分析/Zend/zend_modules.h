@@ -68,11 +68,11 @@ struct _zend_module_entry {
 	unsigned char zts;
 	struct _zend_ini_entry *ini_entry;
 	char *name;
-	struct _zend_function_entry *functions;
-	int (*module_startup_func)(INIT_FUNC_ARGS);
-	int (*module_shutdown_func)(SHUTDOWN_FUNC_ARGS);
-	int (*request_startup_func)(INIT_FUNC_ARGS);
-	int (*request_shutdown_func)(SHUTDOWN_FUNC_ARGS);
+	struct _zend_function_entry *functions;             // 模块的函数列表
+	int (*module_startup_func)(INIT_FUNC_ARGS);         // 模块初始化接口
+	int (*module_shutdown_func)(SHUTDOWN_FUNC_ARGS);    // 模块析构化接口
+	int (*request_startup_func)(INIT_FUNC_ARGS);        // 模块请求初始化接口
+	int (*request_shutdown_func)(SHUTDOWN_FUNC_ARGS);   // 模块请求析构化接口
 	void (*info_func)(ZEND_MODULE_INFO_FUNC_ARGS);
 	char *version;
 	int (*post_deactivate_func)(void);
