@@ -378,10 +378,12 @@ int zend_startup(zend_utility_functions *utility_functions, char **extensions, i
 	zend_version_info = strdup(ZEND_CORE_VERSION_INFO);
 	zend_version_info_length = sizeof(ZEND_CORE_VERSION_INFO)-1;
 
-	GLOBAL_FUNCTION_TABLE = (HashTable *) malloc(sizeof(HashTable));
-	GLOBAL_CLASS_TABLE = (HashTable *) malloc(sizeof(HashTable));
+	GLOBAL_FUNCTION_TABLE = (HashTable *) malloc(sizeof(HashTable)); // function's table
+	GLOBAL_CLASS_TABLE = (HashTable *) malloc(sizeof(HashTable));    // class's table
+
 	zend_hash_init_ex(GLOBAL_FUNCTION_TABLE, 100, NULL, ZEND_FUNCTION_DTOR, 1, 0);
 	zend_hash_init_ex(GLOBAL_CLASS_TABLE, 10, NULL, ZEND_CLASS_DTOR, 1, 0);
+
 	register_standard_class();
 	zend_hash_init_ex(&module_registry, 50, NULL, ZEND_MODULE_DTOR, 1, 0);
 	zend_init_rsrc_list_dtors();
