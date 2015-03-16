@@ -29,6 +29,7 @@ static void set_nonblock(int socket)
 }
 
 /* Initiate input raw socket */
+// 初始化原生socket
 static int init_input_raw_socket()
 {
     int       sock, recv_buf_opt, ret;
@@ -110,7 +111,7 @@ static int retrieve_raw_sockets(int sock)
     struct iphdr  *ip_header;
 
     while(1){
-        recv_len = recvfrom(sock, recv_buf, RECV_BUF_SIZE, 0, NULL, NULL);
+        recv_len = recvfrom(sock, recv_buf, RECV_BUF_SIZE, 0, NULL, NULL); // 读取数据
         if(recv_len < 0){
             err = errno;
             if(EAGAIN == err){
@@ -236,9 +237,9 @@ static void dispose_event(int fd)
     struct msg_server_s *msg;
 
     event_cnt++;
-    if(fd == raw_sock){
+    if(fd == raw_sock){ // 如果是原生socket可读写
         retrieve_raw_sockets(fd);
-    }else{
+    }else{ // 普通socket
         msg = msg_client_recv(fd);
         if(NULL == msg ){
             fprintf(stderr, "NULL msg :\n");
@@ -307,17 +308,17 @@ int tcp_copy_init()
     uint16_t               online_port, target_port;
     uint32_t               target_ip;
 
-    select_server_set_callback(dispose_event);
+    select_server_set_callback(dispose_event); // 事件处理callback
 
     /* Init session table*/
-    init_for_sessions();
-    localhost = inet_addr("127.0.0.1"); 
+    init_for_sessions();  // 初始化session哈希表
+    localhost = inet_addr("127.0.0.1");
 
     /* Init input raw socket info */
-    raw_sock = init_input_raw_socket();
+    raw_sock = init_input_raw_socket(); // 初始化原生socket
     if(raw_sock != -1){
         /* Add the input raw socket to select */
-        select_server_add(raw_sock);
+        select_server_add(raw_sock);  // 把原生socket添加到select中监听
         /* Init output raw socket info */
         send_init();
         /* Add connections to the tested server for exchanging info */

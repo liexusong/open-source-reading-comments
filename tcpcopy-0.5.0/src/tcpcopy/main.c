@@ -316,7 +316,7 @@ static int set_details()
     /* Set signal handler */    
     set_signal_handler();
     /* Set ip port pair mapping according to settings */
-    retrieve_target_addresses();
+    retrieve_target_addresses(); // 解析-x参数传入的IP
 #if (TCPCOPY_MYSQL_ADVANCED)  
     if(NULL != clt_settings.user_pwd){
         retrieve_mysql_user_pwd_info(clt_settings.user_pwd);
@@ -369,7 +369,7 @@ int main(int argc ,char **argv)
     /* Set details for running */
     set_details();
     /* Initiate tcpcopy client*/
-    ret = tcp_copy_init();
+    ret = tcp_copy_init();  // 在manager.c文件中
     if(SUCCESS != ret){
         exit(EXIT_FAILURE);
     }
