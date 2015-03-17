@@ -2254,7 +2254,8 @@ bool is_packet_needed(const char *packet)
 
     /* Here we filter the packets we do care about */
     if(LOCAL == check_pack_src(&(clt_settings.transfer), 
-                ip_header->daddr, tcp_header->dest)){
+        ip_header->daddr, tcp_header->dest))
+    { // 如果当前数据包是本地产生的
         is_needed = true;
         cont_len  = tot_len - size_tcp - size_ip;
         if(tcp_header->syn){
@@ -2321,8 +2322,9 @@ void process(char *packet)
     if(0 == start_p_time){
         start_p_time = now;
     }else{
-        run_time = now -start_p_time;
+        run_time = now - start_p_time;
     }
+
     diff = now - last_stat_time;
     if(diff > 5){
         /* Output statistics */
@@ -2331,12 +2333,12 @@ void process(char *packet)
         activate_dead_sessions();
     }
 
-    ip_header  = (struct iphdr*)packet;
-    size_ip    = ip_header->ihl<<2;
-    tcp_header = (struct tcphdr*)((char *)ip_header + size_ip);
+    ip_header  = (struct iphdr*)packet;  // IP头部
+    size_ip    = ip_header->ihl<<2;      // IP头部大小
+    tcp_header = (struct tcphdr*)((char *)ip_header + size_ip); // TCP头部
     tf         = &(clt_settings.transfer);
 
-    if(check_pack_src(tf, ip_header->saddr, tcp_header->source) == REMOTE){
+    if(check_pack_src(tf, ip_header->saddr, tcp_header->source) == REMOTE){ // 如果当前包是远程服务器发送过来的
         /* When the packet comes from the targeted test machine */
         key = get_key(ip_header->daddr, tcp_header->dest);
         s = hash_find(sessions_table, key);
@@ -2348,6 +2350,7 @@ void process(char *packet)
                 s = hash_find(sessions_table, key);
             }
         }
+
         if(s){
             s->last_update_time = now;
             process_backend_packet(s, ip_header, tcp_header);
@@ -2374,7 +2377,7 @@ void process(char *packet)
             log_info(LOG_DEBUG, "no active session for me");
 #endif
         }
-    }else if(check_pack_src(tf, ip_header->daddr, tcp_header->dest) == LOCAL){
+    }else if(check_pack_src(tf, ip_header->daddr, tcp_header->dest) == LOCAL){ // 如果当前包是发送给本服务器的
         /* When the packet comes from client */
         if(clt_settings.factor){
             /* Change client source port*/

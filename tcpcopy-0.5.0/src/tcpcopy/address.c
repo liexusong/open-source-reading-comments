@@ -10,7 +10,7 @@ void address_add_msg_conn(uint16_t local_port, uint32_t dst_ip,
 {
     addr[local_port].ip   = dst_ip;
     addr[local_port].port = dst_port;
-    addr[local_port].sock = msg_client_init(dst_ip, dst_port);
+    addr[local_port].sock = msg_client_init(dst_ip, dst_port); // connect to dest server
     select_server_add(addr[local_port].sock);
 }
 

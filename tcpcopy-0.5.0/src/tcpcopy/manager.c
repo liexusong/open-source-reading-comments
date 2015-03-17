@@ -130,12 +130,12 @@ static int retrieve_raw_sockets(int sock)
             break;
         }
         packet = recv_buf;
-        if(is_packet_needed((const char *)packet)){
+        if(is_packet_needed((const char *)packet)){ // 是否需要接收此包
             valid_raw_packs++;
             replica_num = clt_settings.replica_num;
             packet_num = 1;
             ip_header   = (struct iphdr*)packet;
-            if(localhost == ip_header->saddr){
+            if(localhost == ip_header->saddr){ // 如果是由"127.0.0.1"-IP产生的数据把
                 if(0 != clt_settings.lo_tf_ip){
                     ip_header->saddr = clt_settings.lo_tf_ip;
                 }
