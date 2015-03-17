@@ -2333,9 +2333,9 @@ void process(char *packet)
         activate_dead_sessions();
     }
 
-    ip_header  = (struct iphdr*)packet;  // IP头部
-    size_ip    = ip_header->ihl<<2;      // IP头部大小
-    tcp_header = (struct tcphdr*)((char *)ip_header + size_ip); // TCP头部
+    ip_header  = (struct iphdr*)packet;                          // IP头部
+    size_ip    = ip_header->ihl<<2;                              // IP头部大小
+    tcp_header = (struct tcphdr*)((char *)ip_header + size_ip);  // TCP头部
     tf         = &(clt_settings.transfer);
 
     if(check_pack_src(tf, ip_header->saddr, tcp_header->source) == REMOTE){ // 如果当前包是远程服务器发送过来的

@@ -61,6 +61,9 @@ ip_port_pair_mapping_t *get_test_pair(ip_port_pair_mappings_t *transfer,
     return pair;
 }
 
+/*
+ * 检查数据包的来源
+ */
 int check_pack_src(ip_port_pair_mappings_t *transfer,
         uint32_t ip, uint16_t port)
 {
@@ -87,7 +90,7 @@ int check_pack_src(ip_port_pair_mappings_t *transfer,
 
 unsigned char *copy_ip_packet(struct iphdr *ip_header)
 {
-    uint16_t tot_len    = ntohs(ip_header->tot_len);
+    uint16_t tot_len = ntohs(ip_header->tot_len);
     unsigned char *data = (unsigned char *)malloc(tot_len);
     if(NULL != data){    
         memcpy(data, ip_header, tot_len);
@@ -117,7 +120,7 @@ static unsigned short buf[32768];
 unsigned short tcpcsum(unsigned char *iphdr, unsigned short *packet,
         int pack_len)
 {       
-    unsigned short        res;
+    unsigned short res;
 
     memcpy(buf, iphdr + 12, 8); 
     *(buf + 4) = htons((unsigned short)(*(iphdr + 9)));

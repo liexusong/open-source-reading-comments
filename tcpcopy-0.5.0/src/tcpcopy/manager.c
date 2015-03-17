@@ -29,7 +29,9 @@ static void set_nonblock(int socket)
 }
 
 /* Initiate input raw socket */
-// 初始化原生socket
+/*
+ * 初始化原生socket
+ */
 static int init_input_raw_socket()
 {
     int       sock, recv_buf_opt, ret;
@@ -44,10 +46,10 @@ static int init_input_raw_socket()
      * ETH_P_IP
      * Internet Protocol packet that is related to the Ethernet 
      */
-    sock = socket(AF_PACKET, SOCK_DGRAM, htons(ETH_P_IP));
+    sock = socket(AF_PACKET, SOCK_DGRAM, htons(ETH_P_IP)); // 物理层(链路层)
 #else 
     /* Copy ip datagram from IP layer*/
-    sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
+    sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP); // IP层
 #endif
     if(-1 == sock){
         perror("socket");
@@ -98,6 +100,7 @@ static int replicate_packs(char *packet, int length, int replica_num)
 
 /*
  * Retrieve raw packets
+ * 从原始套接字获取数据
  */
 static int retrieve_raw_sockets(int sock)
 {
@@ -110,7 +113,7 @@ static int retrieve_raw_sockets(int sock)
     struct tcphdr *tcp_header;
     struct iphdr  *ip_header;
 
-    while(1){
+    while(1) {
         recv_len = recvfrom(sock, recv_buf, RECV_BUF_SIZE, 0, NULL, NULL); // 读取数据
         if(recv_len < 0){
             err = errno;
@@ -120,22 +123,29 @@ static int retrieve_raw_sockets(int sock)
             perror("recvfrom");
             log_info(LOG_ERR, "recvfrom:%s", strerror(errno));
         }
+
         if(0 == recv_len){
             log_info(LOG_ERR, "recv len is 0");
             break;
         }
+
         raw_packs++;
+
         if(recv_len > RECV_BUF_SIZE){
             log_info(LOG_ERR, "recv_len:%d ,it is too long", recv_len);
             break;
         }
+    
         packet = recv_buf;
+
         if(is_packet_needed((const char *)packet)){ // 是否需要接收此包
+
             valid_raw_packs++;
             replica_num = clt_settings.replica_num;
             packet_num = 1;
-            ip_header   = (struct iphdr*)packet;
-            if(localhost == ip_header->saddr){ // 如果是由"127.0.0.1"-IP产生的数据把
+            ip_header = (struct iphdr*)packet; // IP头部
+    
+            if(localhost == ip_header->saddr){ // 如果是由本地服务发送过来的数据
                 if(0 != clt_settings.lo_tf_ip){
                     ip_header->saddr = clt_settings.lo_tf_ip;
                 }
